@@ -20,7 +20,7 @@
 #' @param data A data frame or tibble, typically the output of
 #'   [fit_infiltration()] joined with sample metadata.
 #' @param texture Bare column name or character scalar; USDA texture class (e.g.
-#'   `"Sandy Loam"`). Must match the names in [minidisk_vg_params].
+#'   `"sandy loam"`). Must match the names in [minidisk_vg_params].
 #' @param suction Bare column name or numeric scalar; applied suction in cm
 #'   (e.g. `2`). Must be one of the tabulated levels (0.5, 1, 2, 3, 4, 5, 6, 7)
 #'   when `method = "tabulated"`.
@@ -61,7 +61,7 @@
 #' minidisk |>
 #'   infiltration_cumulative(time = time, volume = volume) |>
 #'   fit_infiltration(.infiltration, .sqrt_time) |>
-#'   minidisk_conductivity(texture = "Sandy Loam", suction = 2)
+#'   minidisk_conductivity(texture = "sandy loam", suction = 2)
 #'
 #' # Multi-sample pipeline: join sample metadata back after fitting so that
 #' # texture and suction are available to minidisk_conductivity().
@@ -73,7 +73,7 @@
 #' )
 #' meta <- tibble(
 #'   sample  = c("A", "B"),
-#'   texture = c("Sandy Loam", "Loam"),
+#'   texture = c("sandy loam", "loam"),
 #'   suction = 2
 #' )
 #'
@@ -88,7 +88,7 @@
 #' minidisk |>
 #'   infiltration_cumulative(time = time, volume = volume) |>
 #'   fit_infiltration(.infiltration, .sqrt_time) |>
-#'   minidisk_conductivity(texture = "Sandy Loam", suction = 2,
+#'   minidisk_conductivity(texture = "sandy loam", suction = 2,
 #'                         method = "zhang", radius = 2.25)
 #'
 #' @export
