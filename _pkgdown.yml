@@ -1,0 +1,64 @@
+url: https://taakefyrsten.github.io/tidysoilinfiltration
+
+template:
+  bootstrap: 5
+  bootswatch: flatly
+
+home:
+  title: "tidysoilinfiltration — Tidy soil infiltration analysis"
+  description: >
+    Pipe-compatible, tibble-in/tibble-out tools for soil infiltration analysis
+    covering the Minidisk tension-disc infiltrometer (Zhang 1997), ponded ring
+    infiltration (Philip 1957; Horton 1940; Kostiakov 1932), and the BeerKan
+    ring experiment with the BEST algorithm (Lassabatère et al. 2006).
+
+navbar:
+  structure:
+    left:  [intro, reference, articles, news]
+    right: [github]
+  components:
+    intro:
+      text: "Get started"
+      href: articles/minidisk.html
+    github:
+      icon: fab fa-github
+      href: https://github.com/Taakefyrsten/tidysoilinfiltration
+      aria-label: GitHub
+
+reference:
+  - title: "Minidisk — tension-disc infiltrometer"
+    desc: "Process Minidisk time–volume readings and compute K(h) via Zhang (1997)"
+    contents:
+      - infiltration_cumulative
+      - fit_infiltration
+      - infiltration_vg_params
+      - parameter_A_zhang
+      - hydraulic_conductivity_minidisk
+  - title: "Ring infiltration — ponded methods"
+    desc: "Analyse standard ponded ring data with Philip, Horton, and Kostiakov models"
+    contents:
+      - infiltration_rate
+      - fit_infiltration_horton
+      - fit_infiltration_kostiakov
+  - title: "BeerKan — BEST algorithm"
+    desc: "Process BeerKan pour-event data and fit the BEST algorithm"
+    contents:
+      - beerkan_cumulative
+      - fit_best
+  - title: "Data"
+    desc: "Built-in reference datasets"
+    contents:
+      - minidisk_vg_params
+
+articles:
+  - title: "Tutorials"
+    navbar: "Tutorials"
+    contents:
+      - minidisk
+      - ring-infiltration
+      - beerkan-best
+
+news:
+  releases:
+    - text: "tidysoilinfiltration 1.0.0"
+      href: news/index.html

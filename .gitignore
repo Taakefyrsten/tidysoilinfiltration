@@ -1,0 +1,6 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+# pkgdown docs dir managed by CI — ignore locally
+docs/

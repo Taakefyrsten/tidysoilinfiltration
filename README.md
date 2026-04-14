@@ -1,0 +1,183 @@
+# tidysoilinfiltration
+
+**Tidy Tools for Soil Infiltration Analysis**
+
+Part of the [TidySoils](https://github.com/Taakefyrsten/TidySoils) ecosystem.
+
+---
+
+`tidysoilinfiltration` brings three field infiltration methods into the tidyverse: the **Minidisk tension-disc infiltrometer** (Zhang 1997), **standard ponded ring infiltration** (Philip 1957; Horton 1940; Kostiakov 1932), and the **BeerKan ring experiment** analysed with the BEST algorithm (Lassabatère et al. 2006). Every function is pipe-compatible, uses tidy evaluation for column arguments, and is vectorised for raster-scale workflows.
+
+## Installation
+
+```r
+# install.packages("devtools")
+devtools::install_github("Taakefyrsten/tidysoilinfiltration")
+```
+
+## Three measurement modes
+
+| Mode | Device | Protocol | Key output |
+|------|--------|----------|------------|
+| **Minidisk** | Tension-disc infiltrometer | Volume at fixed times | K(h) at applied tension |
+| **Ring** | Single/double ring | Volume at fixed times | Ksat |
+| **BeerKan** | Ring (any size) | Fixed volume poured; record time to infiltrate | Ksat + sorptivity S + VG α |
+
+---
+
+## Mode 1: Minidisk Infiltrometer
+
+```r
+library(tidysoilinfiltration)
+library(dplyr)
+
+raw_data <- tibble::tibble(
+  sample = rep(c("A", "B"), each = 11),
+  time   = rep(seq(0, 300, 30), 2),
+  volume = c(95, 89, 86, 83, 80, 77, 74, 73, 71, 69, 67,
+             83, 77, 64, 61, 58, 45, 42, 35, 29, 17, 15)
+)
+
+meta <- tibble::tibble(
+  sample  = c("A", "B"),
+  texture = c("sandy loam", "clay loam"),
+  suction = c(4, 2)          # applied tension in cm
+)
+
+raw_data |>
+  group_by(sample) |>
+  infiltration_cumulative(time = time, volume = volume) |>  # radius = 2.25 cm default
+  fit_infiltration(infiltration_col = .infiltration,
+                   sqrt_time_col    = .sqrt_time) |>
+  left_join(meta, by = "sample") |>
+  infiltration_vg_params(texture = texture, suction = suction) |>
+  hydraulic_conductivity_minidisk(C1 = .C1, A = .A)
+# Adds .K_h (cm/s) — unsaturated hydraulic conductivity at the applied tension
+```
+
+Alternatively, compute A analytically from VG parameters instead of the lookup table:
+
+```r
+# After fit_infiltration() and obtaining n and alpha from another source:
+result |>
+  parameter_A_zhang(n = n_col, alpha = alpha_col, suction = suction) |>
+  hydraulic_conductivity_minidisk(C1 = .C1, A = .A)
+```
+
+---
+
+## Mode 2: Ring Infiltrometer
+
+### Philip model (Ksat ≈ C1)
+
+```r
+ring_data |>
+  group_by(site) |>
+  infiltration_cumulative(time = time, volume = volume, radius = 10) |>
+  fit_infiltration(infiltration_col = .infiltration,
+                   sqrt_time_col    = .sqrt_time)
+# .C1 ≈ Ksat (cm/s)
+```
+
+### Horton model
+
+```r
+ring_data |>
+  group_by(site) |>
+  infiltration_cumulative(time = time, volume = volume, radius = 10) |>
+  infiltration_rate(time_col = time, infiltration_col = .infiltration) |>
+  fit_infiltration_horton(rate_col = .rate, time_col = .time_mid)
+# Returns .fc ≈ Ksat, .f0 (initial rate), .k (decay constant)
+```
+
+### Kostiakov model
+
+```r
+ring_data |>
+  group_by(site) |>
+  infiltration_cumulative(time = time, volume = volume, radius = 10) |>
+  fit_infiltration_kostiakov(infiltration_col = .infiltration, time_col = time)
+# Returns .a and .b; note: Kostiakov f → 0 as t → ∞ (no true Ksat)
+```
+
+---
+
+## Mode 3: BeerKan / BEST
+
+BeerKan data has a **different structure** from standard ring data: instead of measuring volume at fixed times, you pour a fixed volume and record how long it takes to infiltrate.
+
+```r
+pour_data <- tibble::tibble(
+  site   = rep(c("A", "B"), each = 10),
+  volume = 100,    # mL per pour
+  time   = c(15, 22, 30, 38, 44, 48, 50, 51, 51, 52,   # seconds to infiltrate
+             25, 35, 45, 55, 62, 67, 70, 71, 72, 72)
+)
+
+soil_meta <- tibble::tibble(
+  site    = c("A", "B"),
+  texture = c("loam", "sandy loam"),
+  theta_s = c(0.45, 0.40),
+  theta_i = c(0.12, 0.08)
+) |>
+  infiltration_vg_params(texture = texture, suction = 0)   # suction = 0 for BeerKan
+
+pour_data |>
+  group_by(site) |>
+  beerkan_cumulative(volume_col = volume, time_col = time, radius = 5) |>
+  left_join(soil_meta, by = "site") |>
+  fit_best(
+    infiltration_col = .infiltration,
+    time_col         = .cumulative_time,
+    theta_s          = theta_s,
+    theta_i          = theta_i,
+    n                = .n,            # VG shape parameter from texture lookup
+    method           = "steady"       # BEST-steady (default, recommended)
+  )
+# Returns .Ks (cm/s), .S (cm/s^0.5), .alpha (1/cm) per site
+```
+
+---
+
+## Function reference
+
+| Function | Mode | Purpose |
+|----------|------|---------|
+| `infiltration_cumulative()` | Minidisk / Ring | Convert (t, V) series to cumulative I |
+| `beerkan_cumulative()` | BeerKan | Convert pour-event data to cumulative I(t) |
+| `infiltration_rate()` | Ring / BeerKan | Compute dI/dt at each interval |
+| `fit_infiltration()` | All | Philip two-term fit → C1, C2 |
+| `infiltration_vg_params()` | Minidisk / BeerKan | Look up n, α, A from texture + suction |
+| `parameter_A_zhang()` | Minidisk | Compute A analytically (Zhang 1997) |
+| `hydraulic_conductivity_minidisk()` | Minidisk | K(h) = C1 / A |
+| `fit_infiltration_horton()` | Ring | Horton model → fc ≈ Ksat |
+| `fit_infiltration_kostiakov()` | Ring | Kostiakov power model → a, b |
+| `fit_best()` | BeerKan | BEST algorithm → Ks, S, α |
+
+### Built-in dataset
+
+`minidisk_vg_params` — tidy long-format table of Van Genuchten parameters (n, α) and
+tabulated A values for a 2.25 cm disc, covering 12 USDA texture classes at
+suction levels 0.5–7 cm (Decagon Devices, Inc., 2005).
+
+---
+
+## Design principles
+
+All functions follow the TidySoils conventions:
+
+- **Pipe-compatible** — every function takes a data frame as its first argument and returns a tibble with result columns (prefixed `.`) appended.
+- **Tidy evaluation** — column arguments accept bare column names, scalars, or any mix.
+- **Vectorised backends** — no R-level loops over rows. Group-aware operations use `dplyr::mutate()` with `cumsum()`, `first()`, and `lag()`.
+- **Group-native** — all fitting functions respect `dplyr::group_by()` and return one row per group, with optional parallel fitting via `workers`.
+
+---
+
+## References
+
+- Lassabatère, L. et al. (2006). BEST. *SSSAJ* 70(2):521–532. https://doi.org/10.2136/sssaj2005.0026
+- Zhang, R. (1997). Disk infiltrometer K(h). *SSSAJ* 61(4):1024–1030. https://doi.org/10.2136/sssaj1997.03615995006100060008x
+- Philip, J. R. (1957). Sorptivity and algebraic infiltration equations. *Soil Sci.* 84:257–264.
+- Haverkamp, R. et al. (1994). Three-dimensional analysis of infiltration. *WRR* 30(11):2931–2935.
+- Horton, R. E. (1940). Infiltration capacity. *SSSAP* 5:399–417.
+- Decagon Devices, Inc. (2005). *Mini Disk Infiltrometer User's Manual*.

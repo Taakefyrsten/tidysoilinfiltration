@@ -1,0 +1,225 @@
+---
+title: "BeerKan experiment and the BEST algorithm"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{BeerKan experiment and the BEST algorithm}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  fig.width  = 7,
+  fig.height = 4.5
+)
+```
+
+```{r packages, message=FALSE}
+library(tidysoilinfiltration)
+library(dplyr)
+library(tibble)
+library(ggplot2)
+```
+
+## Overview
+
+The **BeerKan** (Beerkan Estimation of Soil Transfer parameters) protocol is
+a low-cost field method: a fixed volume of water is poured repeatedly inside a
+ring, and the time for each pour to completely infiltrate is recorded. Unlike
+standard ring or Minidisk methods, measurement proceeds at **zero pressure
+head** (ponded).
+
+The **BEST algorithm** (Lassabatère et al., 2006) fits the Haverkamp et al.
+(1994) quasi-exact implicit infiltration model to the resulting I(t) series,
+recovering both the **saturated hydraulic conductivity Ks** and the
+**sorptivity S**. The Van Genuchten scale parameter **α** is then recovered
+analytically.
+
+| Step | Function |
+|------|----------|
+| Pour events → cumulative I(t) | `beerkan_cumulative()` |
+| VG shape params (n, α) | `infiltration_vg_params(..., suction = 0)` |
+| Philip quick estimate | `fit_infiltration()` |
+| BEST: Ks, S, α | `fit_best()` |
+
+---
+
+## 1. Field data
+
+A BeerKan run pours a fixed 100 mL of water 10 times into a ring (radius
+5 cm), recording how long each pour takes to disappear.
+
+```{r raw-data}
+run <- tibble(
+  pour   = 1:10,
+  volume = 100,                                     # mL per pour
+  time   = c(12, 18, 25, 30, 33, 34, 35, 35, 36, 35)  # s to infiltrate
+)
+run
+```
+
+The infiltration time increases early on (soil is initially dry) then
+stabilises near 35 s as the soil approaches steady state.
+
+---
+
+## 2. Cumulative infiltration
+
+`beerkan_cumulative()` accumulates both time and volume, then converts to
+depth using the ring area.
+
+```{r cumulative}
+cum <- beerkan_cumulative(run, volume_col = volume, time_col = time, radius = 5)
+cum |> select(pour, volume, time, .cumulative_time, .infiltration)
+```
+
+```{r plot-cumulative}
+ggplot(cum, aes(x = .cumulative_time, y = .infiltration)) +
+  geom_point() +
+  geom_line() +
+  labs(title = "Cumulative BeerKan infiltration",
+       x = "Cumulative time (s)", y = "Infiltration depth (cm)")
+```
+
+The curve transitions from a rapid early phase to a linear steady-state,
+consistent with the Haverkamp model.
+
+---
+
+## 3. VG shape parameters from texture
+
+For BEST we need the Van Genuchten shape parameter n. Since the experiment
+runs at zero pressure head, use `suction = 0` to retrieve only the shape
+parameters (`.A` will be `NA`, which is expected):
+
+```{r vg-params}
+soil_meta <- tibble(texture = "loam", theta_s = 0.43, theta_i = 0.12) |>
+  infiltration_vg_params(texture = texture, suction = 0)
+
+soil_meta |> select(texture, theta_s, theta_i, .n, .alpha, .A)
+```
+
+---
+
+## 4. Philip quick estimate
+
+Before running BEST, a quick Philip two-term fit gives a preliminary sorptivity
+and conductivity proxy.
+
+```{r philip}
+philip <- fit_infiltration(cum,
+                           infiltration_col = .infiltration,
+                           sqrt_time_col    = .sqrt_time)
+philip
+```
+
+C₁ (`r signif(philip$.C1, 3)` cm/s) is a rough Ks proxy; BEST will refine
+this using the full Haverkamp model.
+
+---
+
+## 5. BEST algorithm
+
+`fit_best()` accepts the cumulative I(t) data together with the soil moisture
+parameters (theta_s, theta_i) and the VG shape exponent n.
+
+```{r best}
+best <- fit_best(
+  cum,
+  infiltration_col = .infiltration,
+  time_col         = .cumulative_time,
+  theta_s          = 0.43,
+  theta_i          = 0.12,
+  n                = soil_meta$.n
+)
+best
+```
+
+The key outputs:
+
+| Parameter | Symbol | Value | Units |
+|-----------|--------|-------|-------|
+| Saturated hydraulic conductivity | Ks | `r signif(best$.Ks, 3)` | cm/s |
+| Sorptivity | S | `r signif(best$.S, 3)` | cm/s^0.5 |
+| VG scale parameter | α | `r signif(best$.alpha, 3)` | 1/cm |
+
+---
+
+## 6. Comparing BEST methods
+
+Three fitting strategies are available. `"steady"` (default) uses the last
+`steady_n = 4` points to define the steady-state window; `"slope"` uses the
+early-time transient to estimate S independently.
+
+```{r best-methods}
+methods <- c("steady", "slope", "intercept")
+
+results <- lapply(methods, function(m) {
+  fit_best(
+    cum,
+    infiltration_col = .infiltration,
+    time_col         = .cumulative_time,
+    theta_s = 0.43, theta_i = 0.12,
+    n       = soil_meta$.n,
+    method  = m
+  ) |>
+    mutate(method = m)
+}) |>
+  bind_rows()
+
+results |> select(method, .Ks, .S, .alpha, .convergence)
+```
+
+---
+
+## 7. Multi-site workflow
+
+For field campaigns, group by site and process all runs together.
+
+```{r multi-site}
+field_runs <- tibble(
+  site   = rep(c("S1", "S2"), each = 10),
+  pour   = rep(1:10, 2),
+  volume = 100,
+  time   = c(
+    12, 18, 25, 30, 33, 34, 35, 35, 36, 35,   # S1 — loam
+    8,  11, 14, 17, 19, 20, 20, 21, 20, 21    # S2 — sandy loam (faster)
+  )
+)
+
+multi_cum <- field_runs |>
+  group_by(site) |>
+  beerkan_cumulative(volume_col = volume, time_col = time, radius = 5)
+
+multi_best <- multi_cum |>
+  group_by(site) |>
+  fit_best(
+    infiltration_col = .infiltration,
+    time_col         = .cumulative_time,
+    theta_s = c(0.43, 0.40),
+    theta_i = c(0.12, 0.08),
+    n       = c(1.56, 1.89)
+  )
+
+multi_best |> select(site, .Ks, .S, .alpha, .convergence)
+```
+
+Site S2 (sandy loam) shows higher Ks, consistent with its coarser texture and
+faster infiltration times.
+
+---
+
+## References
+
+Haverkamp, R., Ross, P. J., Smettem, K. R. J., & Parlange, J.-Y. (1994).
+Three-dimensional analysis of infiltration from the disc infiltrometer:
+2. Physically based infiltration equation. *Water Resources Research*,
+30(11), 2931–2935.
+
+Lassabatère, L., Angulo-Jaramillo, R., Soria Ugalde, J. M., Cuenca, R.,
+Braud, I., & Haverkamp, R. (2006). Beerkan estimation of soil transfer
+parameters through infiltration experiments—BEST. *Soil Science Society of
+America Journal*, 70(2), 521–532.
+<https://doi.org/10.2136/sssaj2005.0026>

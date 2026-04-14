@@ -1,0 +1,215 @@
+---
+title: "Ponded ring infiltration workflow"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Ponded ring infiltration workflow}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  fig.width  = 7,
+  fig.height = 4.5
+)
+```
+
+```{r packages, message=FALSE}
+library(tidysoilinfiltration)
+library(dplyr)
+library(tibble)
+library(ggplot2)
+```
+
+## Overview
+
+Standard ponded ring infiltrometers (single- or double-ring) measure how fast
+water infiltrates at saturation. Three empirical models are available:
+
+| Model | Function | Ksat estimate? | Notes |
+|-------|----------|----------------|-------|
+| Philip (1957) two-term | `fit_infiltration()` | C₁ ≈ Ksat at steady state | Linearisable; fast |
+| Horton (1940) | `fit_infiltration_horton()` | fc ≈ Ksat | Requires rates; NLS fit |
+| Kostiakov (1932) | `fit_infiltration_kostiakov()` | No | Purely empirical power law |
+
+The processing pipeline is:
+
+1. `infiltration_cumulative()` — convert volume readings to I(t)
+2. `infiltration_rate()` — compute interval rates (for Horton)
+3. Fit one or more models to the resulting series
+
+---
+
+## 1. Field data
+
+A 10 cm radius ring measured over one hour, reading the reservoir volume (mL)
+every six minutes.
+
+```{r raw-data}
+ring_raw <- tibble(
+  time   = seq(0, 3600, 360),   # seconds (0 – 60 min)
+  volume = c(500, 445, 407, 377, 350, 326, 302, 279, 256, 234, 211)  # mL
+)
+ring_raw
+```
+
+## 2. Cumulative infiltration and rates
+
+```{r cumulative}
+ring <- ring_raw |>
+  infiltration_cumulative(time = time, volume = volume, radius = 10) |>
+  infiltration_rate(time_col = time, infiltration_col = .infiltration)
+
+ring |> select(time, .infiltration, .rate, .time_mid)
+```
+
+The first `.rate` row is `NA` — there is no preceding interval for the initial
+observation.
+
+```{r plot-cumulative}
+ggplot(ring, aes(x = time, y = .infiltration)) +
+  geom_point() +
+  geom_line() +
+  labs(title = "Cumulative infiltration — ring infiltrometer",
+       x = "Time (s)", y = "Cumulative infiltration (cm)")
+```
+
+```{r plot-rate}
+ring |>
+  filter(!is.na(.rate)) |>
+  ggplot(aes(x = .time_mid, y = .rate)) +
+  geom_point() +
+  geom_line() +
+  labs(title = "Infiltration rate — ring infiltrometer",
+       x = "Time (s)", y = "Rate (cm/s)")
+```
+
+---
+
+## 3. Philip two-term fit
+
+```{r philip}
+philip <- fit_infiltration(ring,
+                           infiltration_col = .infiltration,
+                           sqrt_time_col    = .sqrt_time)
+philip
+```
+
+C₁ (`r signif(philip$.C1, 3)` cm/s) is a proxy for Ksat under ponded
+conditions; C₂ (`r signif(philip$.C2, 3)` cm/s^0.5) is the sorptivity proxy.
+
+---
+
+## 4. Horton model
+
+The Horton (1940) model fits an exponential decay to the infiltration rate
+series:
+
+$$f(t) = f_c + (f_0 - f_c) \cdot e^{-k t}$$
+
+where fc ≈ Ksat.
+
+```{r horton}
+horton <- fit_infiltration_horton(ring,
+                                  rate_col = .rate,
+                                  time_col = .time_mid)
+horton
+```
+
+The Horton estimates: fc = `r signif(horton$.fc, 3)` cm/s ≈ Ksat,
+f0 = `r signif(horton$.f0, 3)` cm/s (initial rate),
+k = `r signif(horton$.k, 4)` s⁻¹ (decay constant).
+
+Visualise the fitted curve:
+
+```{r horton-plot}
+# Predicted rate curve over the observed time range
+t_pred <- seq(180, 3420, 60)
+pred_horton <- tibble(
+  time = t_pred,
+  rate = horton$.fc + (horton$.f0 - horton$.fc) * exp(-horton$.k * t_pred)
+)
+
+ring |>
+  filter(!is.na(.rate)) |>
+  ggplot(aes(x = .time_mid, y = .rate)) +
+  geom_point() +
+  geom_line(data = pred_horton, aes(x = time, y = rate),
+            colour = "steelblue", linewidth = 0.8) +
+  geom_hline(yintercept = horton$.fc, linetype = "dashed", colour = "steelblue") +
+  labs(title    = "Horton model fit",
+       subtitle = paste0("fc = ", signif(horton$.fc, 3), " cm/s"),
+       x = "Time (s)", y = "Rate (cm/s)")
+```
+
+---
+
+## 5. Kostiakov model
+
+The Kostiakov (1932) power model fits cumulative infiltration:
+
+$$I(t) = a \cdot t^b \qquad (a > 0,\ 0 < b < 1)$$
+
+Note that the Kostiakov model does not approach a finite steady-state rate, so
+it cannot provide a Ksat estimate.
+
+```{r kostiakov}
+kostiakov <- fit_infiltration_kostiakov(ring,
+                                        infiltration_col = .infiltration,
+                                        time_col         = time)
+kostiakov
+```
+
+---
+
+## 6. Multi-site workflow
+
+Group the raw data by site and fit all three models in a single pipeline using
+`group_by()`.
+
+```{r multi-site}
+multi_ring <- tibble(
+  site   = rep(c("Field_1", "Field_2"), each = 11),
+  time   = rep(seq(0, 3600, 360), 2),
+  volume = c(
+    500, 445, 407, 377, 350, 326, 302, 279, 256, 234, 211,   # loam
+    500, 404, 349, 308, 271, 237, 202, 168, 134, 100,  66    # sandy loam
+  )
+)
+
+# Cumulative + rate in one pass
+multi_cum <- multi_ring |>
+  group_by(site) |>
+  infiltration_cumulative(time = time, volume = volume, radius = 10) |>
+  infiltration_rate(time_col = time, infiltration_col = .infiltration)
+
+# Philip fit
+multi_philip <- multi_cum |>
+  group_by(site) |>
+  fit_infiltration(infiltration_col = .infiltration,
+                   sqrt_time_col    = .sqrt_time)
+multi_philip
+
+# Horton fit
+multi_horton <- multi_cum |>
+  group_by(site) |>
+  fit_infiltration_horton(rate_col = .rate, time_col = .time_mid)
+multi_horton |> select(site, .fc, .f0, .k, .convergence)
+```
+
+---
+
+## References
+
+Horton, R. E. (1940). An approach toward a physical interpretation of
+infiltration capacity. *Soil Science Society of America Proceedings*,
+5, 399–417.
+
+Kostiakov, A. N. (1932). On the dynamics of the coefficient of
+water-percolation in soils. *Transactions of the 6th Commission of the
+International Society of Soil Science*, Part A, 17–21.
+
+Philip, J. R. (1957). The theory of infiltration: 4. Sorptivity and algebraic
+infiltration equations. *Soil Science*, 84(3), 257–264.

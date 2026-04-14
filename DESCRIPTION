@@ -1,0 +1,41 @@
+Package: tidysoilinfiltration
+Title: Tidy Tools for Soil Infiltration Analysis
+Version: 1.0.0
+Authors@R:
+    person("Einar", "Taakefyrsten", , "einaremil1999@gmail.com",
+           role = c("aut", "cre"),
+           comment = c(ORCID = "0009-0007-5872-4959"))
+Description: A tidy reimagining of soil infiltration analysis covering three
+    field methods: the Minidisk tension-disc infiltrometer (Zhang 1997),
+    standard ponded ring infiltration (Philip 1957; Horton 1940; Kostiakov
+    1932), and the BeerKan ring experiment analysed with the BEST algorithm
+    (Lassabatère et al. 2006). Every function is pipe-compatible, accepts and
+    returns tibbles, uses tidy evaluation for column arguments, and is
+    vectorised for raster-scale workflows.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Depends:
+    R (>= 4.1.0)
+Imports:
+    broom,
+    cli,
+    dplyr,
+    rlang,
+    tibble
+Suggests:
+    ggplot2,
+    knitr,
+    parallel,
+    pkgdown,
+    purrr,
+    rmarkdown,
+    testthat (>= 3.0.0),
+    tidyr
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+URL: https://taakefyrsten.github.io/tidysoilinfiltration,
+    https://github.com/Taakefyrsten/tidysoilinfiltration
+BugReports: https://github.com/Taakefyrsten/tidysoilinfiltration/issues
