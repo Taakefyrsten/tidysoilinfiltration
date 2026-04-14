@@ -84,14 +84,15 @@ infiltration_cumulative <- function(data, time, volume, radius = 2.25) {
   check_positive(radius, "radius")
 
   area <- pi * radius^2
+  grps <- dplyr::group_vars(data)
 
-  # Preserve grouping through mutate so dplyr::first() is group-aware;
-  # convert to plain tibble afterwards to match the rest of the ecosystem.
-  data |>
+  # Coerce to plain tibble first (handles data.frame input), then restore
+  # groups so dplyr::first() is group-aware and grouping is preserved in output.
+  tibble::as_tibble(data) |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(grps))) |>
     dplyr::mutate(
       .sqrt_time          = sqrt(.data[[time_nm]]),
       .volume_infiltrated = dplyr::first(.data[[volume_nm]]) - .data[[volume_nm]],
       .infiltration       = .volume_infiltrated / area
-    ) |>
-    tibble::as_tibble()
+    )
 }

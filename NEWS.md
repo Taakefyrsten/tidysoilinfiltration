@@ -1,3 +1,29 @@
+# tidysoilinfiltration 1.1.0
+
+## New functions
+
+* `minidisk_conductivity()` — convenience wrapper combining
+  `infiltration_vg_params()`, optionally `parameter_A_zhang()`, and
+  `hydraulic_conductivity_minidisk()` into a single pipeline step. Accepts
+  `method = "tabulated"` (default, Decagon lookup) or `method = "zhang"`
+  (analytical A via Zhang 1997). Reduces the Minidisk pipeline from 7 steps to
+  4 and eliminates the double `group_by()`.
+* `ring_conductivity()` — convenience wrapper combining
+  `infiltration_cumulative()`, `infiltration_rate()`, and
+  `fit_infiltration_horton()` into one call. Takes raw time–volume readings from
+  a ponded ring infiltrometer and returns Horton parameters including `.fc` ≈
+  Kfs. Supports the same `group_by()` workflow as all other package functions.
+
+## Bug fixes
+
+* `infiltration_cumulative()` and `infiltration_rate()` previously stripped
+  `group_by()` grouping via an internal `as_tibble()` call, requiring users to
+  re-group before calling `fit_infiltration()`. Both functions now preserve
+  grouping through the pipeline, so a single `group_by()` is sufficient for the
+  entire multi-site workflow.
+
+---
+
 # tidysoilinfiltration 1.0.0
 
 Initial release.

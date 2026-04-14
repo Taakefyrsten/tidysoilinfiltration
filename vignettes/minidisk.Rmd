@@ -29,24 +29,27 @@ The Minidisk Infiltrometer (Decagon Devices) delivers water at a controlled
 tension (suction) below saturation. The Zhang (1997) method extracts the
 **unsaturated hydraulic conductivity K(h)** from a two-step analysis:
 
-1. Fit the Philip (1957) two-term polynomial to cumulative infiltration to get
-   the conductivity proxy C₁.
+1. Fit the Philip (1957) two-term polynomial to cumulative infiltration to
+   recover the conductivity proxy C₁.
 2. Divide C₁ by the soil-specific shape parameter A (derived from Van
-   Genuchten parameters and the applied tension) to recover K(h).
+   Genuchten parameters and the applied tension) to get K(h).
+
+`minidisk_conductivity()` wraps steps 2 in a single call, giving a four-step
+pipeline from raw field readings to K(h):
 
 | Step | Function |
 |------|----------|
 | Raw readings → I(t) | `infiltration_cumulative()` |
-| Philip two-term fit  | `fit_infiltration()` |
-| VG parameter lookup  | `infiltration_vg_params()` |
-| Analytical A (optional) | `parameter_A_zhang()` |
-| K(h) = C₁ / A | `hydraulic_conductivity_minidisk()` |
+| Philip two-term fit → C₁ | `fit_infiltration()` |
+| VG lookup + K(h) = C₁ / A | `minidisk_conductivity()` |
+
+The underlying functions `infiltration_vg_params()`,
+`parameter_A_zhang()`, and `hydraulic_conductivity_minidisk()` remain
+exported for cases that need more control.
 
 ---
 
 ## 1. Single-site example
-
-### 1.1 Field readings
 
 A typical Minidisk run records the reservoir volume (mL) at fixed time
 intervals. The disc radius is 2.25 cm (the standard instrument).
@@ -56,50 +59,17 @@ raw <- tibble(
   time   = seq(0, 300, 30),   # seconds
   volume = c(95, 89, 86, 83, 80, 77, 74, 73, 71, 69, 67)  # mL
 )
-raw
 ```
 
-### 1.2 Cumulative infiltration
+The full pipeline from raw readings to K(h):
 
-`infiltration_cumulative()` computes I = ΔV / (π r²) and appends `.sqrt_time`
-for use in the Philip fit.
+```{r single-pipeline}
+result <- raw |>
+  infiltration_cumulative(time = time, volume = volume) |>
+  fit_infiltration(.infiltration, .sqrt_time) |>
+  minidisk_conductivity(texture = "sandy loam", suction = 2)
 
-```{r single-cumulative}
-cum <- infiltration_cumulative(raw, time = time, volume = volume)
-cum
-```
-
-### 1.3 Philip two-term fit
-
-```{r single-fit}
-philip <- fit_infiltration(cum,
-                           infiltration_col = .infiltration,
-                           sqrt_time_col    = .sqrt_time)
-philip
-```
-
-C₁ is the quadratic (time-proportional) coefficient (cm/s); C₂ is the
-sorptivity term (cm/s^0.5).
-
-### 1.4 Look up Van Genuchten parameters
-
-The Decagon (2005) lookup table covers 12 USDA texture classes at suction
-levels 0.5–7 cm. Assume this soil is sandy loam measured at 2 cm tension.
-
-```{r single-vg}
-# Attach texture and suction to the Philip fit result, then look up parameters
-result <- philip |>
-  mutate(texture = "sandy loam", suction = 2) |>
-  infiltration_vg_params(texture = texture, suction = suction)
-
-result |> select(texture, suction, .C1, .n, .alpha, .A)
-```
-
-### 1.5 Hydraulic conductivity
-
-```{r single-kh}
-result <- hydraulic_conductivity_minidisk(result, C1 = .C1, A = .A)
-result |> select(texture, suction, .C1, .A, .K_h)
+result |> select(.C1, .n, .alpha, .A, .K_h)
 ```
 
 K(h) ≈ `r signif(result$.K_h, 3)` cm/s at 2 cm tension for this sandy loam
@@ -109,8 +79,10 @@ sample.
 
 ## 2. Multi-site workflow
 
-For field campaigns with multiple samples, group the raw data by site and
-process everything in a single pipeline.
+For field campaigns with multiple samples, group by site before
+`infiltration_cumulative()`. Because grouping is now preserved through
+cumulative calculations, only one `group_by()` is needed for the whole
+pipeline.
 
 ```{r multi-data}
 multi <- tibble(
@@ -121,47 +93,48 @@ multi <- tibble(
     95, 87, 81, 76, 72, 68, 65, 63, 61, 59, 58    # site B — loamy sand
   )
 )
-```
 
-```{r multi-pipeline}
-# Site-level metadata
+# Per-site metadata (texture, suction)
 meta <- tibble(
   site    = c("A", "B"),
   texture = c("sandy loam", "loamy sand"),
   suction = c(2, 2)
 )
+```
 
-# infiltration_cumulative() returns an ungrouped tibble, so re-group before
-# fit_infiltration() so it fits one model per site.
+```{r multi-pipeline}
 multi_result <- multi |>
   group_by(site) |>
   infiltration_cumulative(time = time, volume = volume) |>
-  group_by(site) |>
-  fit_infiltration(infiltration_col = .infiltration,
-                   sqrt_time_col    = .sqrt_time) |>
+  fit_infiltration(.infiltration, .sqrt_time) |>
   left_join(meta, by = "site") |>
-  infiltration_vg_params(texture = texture, suction = suction) |>
-  hydraulic_conductivity_minidisk(C1 = .C1, A = .A)
+  minidisk_conductivity(texture = texture, suction = suction)
 
 multi_result |> select(site, texture, .C1, .A, .K_h)
 ```
 
 ---
 
-## 3. Analytical A with `parameter_A_zhang()`
+## 3. Analytical A with `method = "zhang"`
 
-For non-standard disc radii or suction levels not in the Decagon table, compute
-A analytically using the Zhang (1997) formula.
+For non-standard disc radii or suction levels outside the Decagon table,
+pass `method = "zhang"` to compute A analytically from Zhang (1997) rather
+than looking it up. The `radius` argument is only used in this mode.
 
 ```{r analytical-A}
-multi_result |>
-  select(site, .n, .alpha, suction) |>
-  parameter_A_zhang(n = .n, alpha = .alpha, suction = suction) |>
-  rename(.A_zhang = .A)
+multi |>
+  group_by(site) |>
+  infiltration_cumulative(time = time, volume = volume) |>
+  fit_infiltration(.infiltration, .sqrt_time) |>
+  left_join(meta, by = "site") |>
+  minidisk_conductivity(texture = texture, suction = suction,
+                        method = "zhang", radius = 2.25) |>
+  select(site, texture, .A, .K_h)
 ```
 
-The analytical A values should be close to the tabulated `.A` retrieved
-via `infiltration_vg_params()`.
+The analytical A values will differ slightly from the tabulated ones — both
+approaches are valid; the choice depends on whether your suction and radius
+match the Decagon reference conditions.
 
 ---
 

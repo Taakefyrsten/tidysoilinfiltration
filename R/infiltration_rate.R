@@ -57,11 +57,13 @@ infiltration_rate <- function(data, time_col, infiltration_col) {
     ))
   }
 
-  data |>
+  grps <- dplyr::group_vars(data)
+
+  tibble::as_tibble(data) |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(grps))) |>
     dplyr::mutate(
       .rate     = (.data[[infilt_nm]] - dplyr::lag(.data[[infilt_nm]])) /
                   (.data[[time_nm]]   - dplyr::lag(.data[[time_nm]])),
       .time_mid = (.data[[time_nm]] + dplyr::lag(.data[[time_nm]])) / 2
-    ) |>
-    tibble::as_tibble()
+    )
 }
