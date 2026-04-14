@@ -131,9 +131,12 @@ meta <- tibble(
   suction = c(2, 2)
 )
 
+# infiltration_cumulative() returns an ungrouped tibble, so re-group before
+# fit_infiltration() so it fits one model per site.
 multi_result <- multi |>
   group_by(site) |>
   infiltration_cumulative(time = time, volume = volume) |>
+  group_by(site) |>
   fit_infiltration(infiltration_col = .infiltration,
                    sqrt_time_col    = .sqrt_time) |>
   left_join(meta, by = "site") |>
