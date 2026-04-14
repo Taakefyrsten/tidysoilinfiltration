@@ -15,11 +15,23 @@ home:
 navbar:
   structure:
     left:  [intro, reference, articles, news]
-    right: [github]
+    right: [ecosystem, github]
   components:
     intro:
       text: "Get started"
       href: articles/minidisk.html
+    ecosystem:
+      text: "TidySoils"
+      menu:
+        - text: "TidySoils ecosystem"
+          href: https://taakefyrsten.github.io/TidySoils
+        - text: "---"
+        - text: "tidysoiltexture"
+          href: https://taakefyrsten.github.io/tidysoiltexture
+        - text: "tidysoilwater"
+          href: https://taakefyrsten.github.io/tidysoilwater
+        - text: "tidysoilinfiltration"
+          href: https://taakefyrsten.github.io/tidysoilinfiltration
     github:
       icon: fab fa-github
       href: https://github.com/Taakefyrsten/tidysoilinfiltration
@@ -29,6 +41,7 @@ reference:
   - title: "Minidisk — tension-disc infiltrometer"
     desc: "Process Minidisk time–volume readings and compute K(h) via Zhang (1997)"
     contents:
+      - minidisk_conductivity
       - infiltration_cumulative
       - fit_infiltration
       - infiltration_vg_params
@@ -37,6 +50,7 @@ reference:
   - title: "Ring infiltration — ponded methods"
     desc: "Analyse standard ponded ring data with Philip, Horton, and Kostiakov models"
     contents:
+      - ring_conductivity
       - infiltration_rate
       - fit_infiltration_horton
       - fit_infiltration_kostiakov
@@ -58,7 +72,16 @@ articles:
       - ring-infiltration
       - beerkan-best
 
+repo:
+  url:
+    home: https://github.com/Taakefyrsten/tidysoilinfiltration
+    source: https://github.com/Taakefyrsten/tidysoilinfiltration/blob/main/
+    issue: https://github.com/Taakefyrsten/tidysoilinfiltration/issues
+    user: https://github.com/
+
 news:
   releases:
+    - text: "tidysoilinfiltration 1.1.0"
+      href: news/index.html
     - text: "tidysoilinfiltration 1.0.0"
       href: news/index.html

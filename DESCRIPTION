@@ -13,6 +13,7 @@ Description: A tidy reimagining of soil infiltration analysis covering three
     returns tibbles, uses tidy evaluation for column arguments, and is
     vectorised for raster-scale workflows.
 License: MIT + file LICENSE
+Date: 2026-04-14
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
