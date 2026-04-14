@@ -1,6 +1,7 @@
-# Build pkgdown site and commit docs/ back to main.
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   release:
     types: [published]
@@ -9,17 +10,23 @@ on:
 name: pkgdown
 
 concurrency:
-  group: pkgdown-${{ github.ref }}
+  group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   pkgdown:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
 
     permissions:
-      contents: write
+      contents: read
+      pages: write
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -36,13 +43,16 @@ jobs:
           needs: website
 
       - name: Build site
-        run: pkgdown::build_site(new_process = FALSE, install = FALSE)
+        run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)
         shell: Rscript {0}
 
-      - name: Commit docs to main
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add docs/
-          git diff --staged --quiet || git commit -m "chore: rebuild pkgdown site [skip ci]"
-          git push
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        if: github.event_name != 'pull_request'
+        id: deployment
+        uses: actions/deploy-pages@v4
