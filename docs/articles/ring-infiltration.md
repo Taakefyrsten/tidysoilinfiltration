@@ -239,7 +239,7 @@ multi_horton |> select(site, .fc, .f0, .k, .convergence)
 #>   site         .fc      .f0      .k .convergence
 #>   <chr>      <dbl>    <dbl>   <dbl> <lgl>       
 #> 1 Field_1 0.000200 0.000611 0.00202 TRUE        
-#> 2 Field_2 0.000295 0.00124  0.00294 TRUE
+#> 2 Field_2 0.000301 0.00124  0.00301 TRUE
 ```
 
 ------------------------------------------------------------------------

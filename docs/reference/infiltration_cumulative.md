@@ -99,6 +99,7 @@ multi |>
   group_by(sample) |>
   infiltration_cumulative(time = time, volume = volume)
 #> # A tibble: 22 × 6
+#> # Groups:   sample [2]
 #>    sample  time volume .sqrt_time .volume_infiltrated .infiltration
 #>    <chr>  <dbl>  <dbl>      <dbl>               <dbl>         <dbl>
 #>  1 A          0     95       0                      0         0    

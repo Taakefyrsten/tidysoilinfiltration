@@ -1,5 +1,50 @@
 # Changelog
 
+## tidysoilinfiltration 1.1.0
+
+### New functions
+
+- [`minidisk_conductivity()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/minidisk_conductivity.md)
+  — convenience wrapper combining
+  [`infiltration_vg_params()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/infiltration_vg_params.md),
+  optionally
+  [`parameter_A_zhang()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/parameter_A_zhang.md),
+  and
+  [`hydraulic_conductivity_minidisk()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/hydraulic_conductivity_minidisk.md)
+  into a single pipeline step. Accepts `method = "tabulated"` (default,
+  Decagon lookup) or `method = "zhang"` (analytical A via Zhang 1997).
+  Reduces the Minidisk pipeline from 7 steps to 4 and eliminates the
+  double
+  [`group_by()`](https://dplyr.tidyverse.org/reference/group_by.html).
+- [`ring_conductivity()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/ring_conductivity.md)
+  — convenience wrapper combining
+  [`infiltration_cumulative()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/infiltration_cumulative.md),
+  [`infiltration_rate()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/infiltration_rate.md),
+  and
+  [`fit_infiltration_horton()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/fit_infiltration_horton.md)
+  into one call. Takes raw time–volume readings from a ponded ring
+  infiltrometer and returns Horton parameters including `.fc` ≈ Kfs.
+  Supports the same
+  [`group_by()`](https://dplyr.tidyverse.org/reference/group_by.html)
+  workflow as all other package functions.
+
+### Bug fixes
+
+- [`infiltration_cumulative()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/infiltration_cumulative.md)
+  and
+  [`infiltration_rate()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/infiltration_rate.md)
+  previously stripped
+  [`group_by()`](https://dplyr.tidyverse.org/reference/group_by.html)
+  grouping via an internal
+  [`as_tibble()`](https://tibble.tidyverse.org/reference/as_tibble.html)
+  call, requiring users to re-group before calling
+  [`fit_infiltration()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/fit_infiltration.md).
+  Both functions now preserve grouping through the pipeline, so a single
+  [`group_by()`](https://dplyr.tidyverse.org/reference/group_by.html) is
+  sufficient for the entire multi-site workflow.
+
+------------------------------------------------------------------------
+
 ## tidysoilinfiltration 1.0.0
 
 Initial release.

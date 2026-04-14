@@ -120,8 +120,9 @@ multi <- tibble(
 fit_infiltration(multi,
                  infiltration_col = .infiltration,
                  sqrt_time_col    = .sqrt_time)
-#> # A tibble: 1 × 5
-#>      .C2     .C1 .C2_std_error .C1_std_error .convergence
-#>    <dbl>   <dbl>         <dbl>         <dbl> <lgl>       
-#> 1 0.0380 0.00803         0.118       0.00618 TRUE        
+#> # A tibble: 2 × 6
+#>   sample    .C2     .C1 .C2_std_error .C1_std_error .convergence
+#>   <chr>   <dbl>   <dbl>         <dbl>         <dbl> <lgl>       
+#> 1 A      0.0600 0.00252       0.00753      0.000396 TRUE        
+#> 2 B      0.0160 0.0135        0.0363       0.00191  TRUE        
 ```

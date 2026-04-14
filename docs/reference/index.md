@@ -4,6 +4,8 @@
 
 Process Minidisk time–volume readings and compute K(h) via Zhang (1997)
 
+- [`minidisk_conductivity()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/minidisk_conductivity.md)
+  : Compute unsaturated hydraulic conductivity from Minidisk data
 - [`infiltration_cumulative()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/infiltration_cumulative.md)
   : Compute cumulative infiltration from time-volume series
 - [`fit_infiltration()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/fit_infiltration.md)
@@ -20,6 +22,9 @@ Process Minidisk time–volume readings and compute K(h) via Zhang (1997)
 Analyse standard ponded ring data with Philip, Horton, and Kostiakov
 models
 
+- [`ring_conductivity()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/ring_conductivity.md)
+  : Estimate saturated hydraulic conductivity from ponded ring
+  infiltration
 - [`infiltration_rate()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/infiltration_rate.md)
   : Compute interval infiltration rates from cumulative data
 - [`fit_infiltration_horton()`](https://taakefyrsten.github.io/tidysoilinfiltration/reference/fit_infiltration_horton.md)
