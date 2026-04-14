@@ -50,26 +50,30 @@
 #' library(tibble)
 #' library(dplyr)
 #'
-#' # Minimal single-sample pipeline: raw data -> K(h) in four steps
+#' # Minimal single-sample pipeline: raw data -> K(h) in four steps.
+#' # fit_infiltration() returns only group keys + coefficients, so pass
+#' # texture and suction as scalars here.
 #' minidisk <- tibble(
 #'   time   = seq(0, 300, 30),
-#'   volume = c(95, 89, 86, 83, 80, 77, 74, 73, 71, 69, 67),
-#'   texture = "Sandy Loam",
-#'   suction = 2
+#'   volume = c(95, 89, 86, 83, 80, 77, 74, 73, 71, 69, 67)
 #' )
 #'
 #' minidisk |>
 #'   infiltration_cumulative(time = time, volume = volume) |>
 #'   fit_infiltration(.infiltration, .sqrt_time) |>
-#'   minidisk_conductivity(texture = texture, suction = suction)
+#'   minidisk_conductivity(texture = "Sandy Loam", suction = 2)
 #'
-#' # Multi-sample pipeline using group_by — no double group_by needed
+#' # Multi-sample pipeline: join sample metadata back after fitting so that
+#' # texture and suction are available to minidisk_conductivity().
 #' multi <- tibble(
 #'   sample  = rep(c("A", "B"), each = 11),
 #'   time    = rep(seq(0, 300, 30), 2),
 #'   volume  = c(95, 89, 86, 83, 80, 77, 74, 73, 71, 69, 67,
-#'               83, 77, 74, 71, 68, 65, 62, 59, 57, 55, 53),
-#'   texture = rep(c("Sandy Loam", "Loam"), each = 11),
+#'               83, 77, 74, 71, 68, 65, 62, 59, 57, 55, 53)
+#' )
+#' meta <- tibble(
+#'   sample  = c("A", "B"),
+#'   texture = c("Sandy Loam", "Loam"),
 #'   suction = 2
 #' )
 #'
@@ -77,13 +81,14 @@
 #'   group_by(sample) |>
 #'   infiltration_cumulative(time = time, volume = volume) |>
 #'   fit_infiltration(.infiltration, .sqrt_time) |>
+#'   left_join(meta, by = "sample") |>
 #'   minidisk_conductivity(texture = texture, suction = suction)
 #'
 #' # Analytical A via Zhang (1997)
 #' minidisk |>
 #'   infiltration_cumulative(time = time, volume = volume) |>
 #'   fit_infiltration(.infiltration, .sqrt_time) |>
-#'   minidisk_conductivity(texture = texture, suction = suction,
+#'   minidisk_conductivity(texture = "Sandy Loam", suction = 2,
 #'                         method = "zhang", radius = 2.25)
 #'
 #' @export
